@@ -21,7 +21,7 @@ public class DiffAnalyzerTests : IDisposable
         // Create initial commit
         var signature = new Signature("Test", "test@test.com", DateTimeOffset.Now);
         File.WriteAllText(Path.Combine(_tempRepoPath, "README.md"), "# Test");
-        Commands.Stage(_repo, "README.md");
+        LibGit2Sharp.Commands.Stage(_repo, "README.md");
         _repo.Commit("Initial commit", signature, signature);
     }
 
@@ -48,7 +48,7 @@ public class DiffAnalyzerTests : IDisposable
         // Modify file and commit
         File.WriteAllText(Path.Combine(_tempRepoPath, "README.md"), "# Test\n\nModified content");
         var signature = new Signature("Test", "test@test.com", DateTimeOffset.Now);
-        Commands.Stage(_repo, "README.md");
+        LibGit2Sharp.Commands.Stage(_repo, "README.md");
         _repo.Commit("Modify README", signature, signature);
         var headCommit = _repo.Head.Tip.Sha;
 
@@ -74,7 +74,7 @@ public class DiffAnalyzerTests : IDisposable
         Directory.CreateDirectory(Path.Combine(_tempRepoPath, "src"));
         File.WriteAllText(Path.Combine(_tempRepoPath, "src", "Program.cs"), "class Program {}");
         var signature = new Signature("Test", "test@test.com", DateTimeOffset.Now);
-        Commands.Stage(_repo, "src/Program.cs");
+        LibGit2Sharp.Commands.Stage(_repo, "src/Program.cs");
         _repo.Commit("Add Program.cs", signature, signature);
         var headCommit = _repo.Head.Tip.Sha;
 
@@ -93,7 +93,7 @@ public class DiffAnalyzerTests : IDisposable
     {
         // Arrange
         File.WriteAllText(Path.Combine(_tempRepoPath, "README.md"), "# Modified");
-        Commands.Stage(_repo, "README.md");
+        LibGit2Sharp.Commands.Stage(_repo, "README.md");
 
         using var analyzer = new DiffAnalyzer(_tempRepoPath);
 
@@ -146,7 +146,7 @@ public class DiffAnalyzerTests : IDisposable
         File.WriteAllText(Path.Combine(_tempRepoPath, "docs", "guide.md"), "# Guide");
 
         var signature = new Signature("Test", "test@test.com", DateTimeOffset.Now);
-        Commands.Stage(_repo, "*");
+        LibGit2Sharp.Commands.Stage(_repo, "*");
         _repo.Commit("Add files", signature, signature);
         var headCommit = _repo.Head.Tip.Sha;
 
