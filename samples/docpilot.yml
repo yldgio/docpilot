@@ -1,0 +1,44 @@
+# DocPilot Configuration
+# Place this file in your repository root as docpilot.yml
+
+paths:
+  allowlist:
+    - "docs/**"
+    - "*.md"
+    - "README*"
+  ignorelist:
+    - ".git/**"
+    - "node_modules/**"
+    - "bin/**"
+    - "obj/**"
+    - "dist/**"
+
+limits:
+  maxFiles: 50
+  maxLines: 5000
+  maxTokensPerRequest: 8000
+
+heuristics:
+  - pattern: "src/**/*.cs"
+    docTarget: "README.md"
+    section: "## API Reference"
+    confidenceBoost: 0.1
+
+  - pattern: "src/**/Controllers/**"
+    docTarget: "docs/api.md"
+    section: "## Endpoints"
+    confidenceBoost: 0.2
+
+  - pattern: "packages/*/**"
+    docTarget: "packages/{0}/README.md"
+    confidenceBoost: 0.15
+
+  - pattern: "terraform/**"
+    docTarget: "docs/infrastructure.md"
+    section: "## Infrastructure"
+    confidenceBoost: 0.1
+
+  - pattern: ".github/workflows/**"
+    docTarget: "docs/ci-cd.md"
+    section: "## CI/CD"
+    confidenceBoost: 0.1
