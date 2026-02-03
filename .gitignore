@@ -1,0 +1,26 @@
+# Build results
+[Bb]in/
+[Oo]bj/
+[Oo]ut/
+
+# IDE
+.vs/
+.vscode/
+*.user
+*.suo
+
+# NuGet
+packages/
+*.nupkg
+
+# Test results
+TestResults/
+coverage/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
