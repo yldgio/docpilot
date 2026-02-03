@@ -1,0 +1,63 @@
+# DocPilot Configuration
+# Copy this file to your repository root as docpilot.yml
+
+# Documentation paths to consider
+docs:
+  paths:
+    - docs/
+    - README.md
+    - CHANGELOG.md
+  
+  # Glob patterns to exclude
+  exclude:
+    - docs/generated/
+    - "*.bak"
+
+# Code paths to analyze for changes
+source:
+  paths:
+    - src/
+    - lib/
+  
+  # File extensions to analyze
+  extensions:
+    - .cs
+    - .ts
+    - .js
+    - .py
+    - .go
+    - .rs
+
+# Confidence threshold for automatic PR creation
+# Values: 0.0 - 1.0
+# Below this threshold, PRs are created as drafts
+confidence:
+  threshold: 0.7
+  draft_below: 0.5
+
+# PR creation settings
+pull_request:
+  # Branch naming pattern (supports: {type}, {timestamp}, {hash})
+  branch_pattern: "docpilot/{type}-{timestamp}"
+  
+  # Default labels to add
+  labels:
+    - documentation
+    - docpilot
+  
+  # Add label based on confidence
+  confidence_labels:
+    high: ready-for-review
+    medium: needs-review
+    low: draft
+
+# Agent settings
+agent:
+  # Model to use (default: gpt-5)
+  model: gpt-5
+  
+  # Enable streaming responses
+  streaming: true
+  
+  # Maximum retries on failure
+  max_retries: 3

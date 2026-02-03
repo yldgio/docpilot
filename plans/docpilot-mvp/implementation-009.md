@@ -1,0 +1,372 @@
+# DocPilot MVP - Implementation Guide (Part 9)
+
+## Step 9: GitHub Actions Workflow
+
+### Step-by-Step Instructions
+
+#### 9.1 Creare directory .github/workflows
+- [x] Esegui:
+
+```powershell
+New-Item -ItemType Directory -Path ".github/workflows" -Force
+```
+
+#### 9.2 Creare docpilot.yml workflow
+- [x] Crea il file `.github/workflows/docpilot.yml`:
+
+```yaml
+name: DocPilot - Documentation Sync
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+    # IMPORTANT: Path filter to prevent infinite loops
+    paths-ignore:
+      - 'docs/**'
+      - '*.md'
+      - 'README.md'
+      - 'CHANGELOG.md'
+      - '.github/workflows/docpilot.yml'
+
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base ref for comparison'
+        required: false
+        default: 'main'
+      head_ref:
+        description: 'Head ref for comparison'
+        required: false
+        default: 'HEAD'
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  DOCPILOT_VERSION: 'latest'
+
+jobs:
+  analyze-and-generate:
+    name: Analyze & Generate Docs
+    runs-on: ubuntu-latest
+    
+    # Skip if PR is from docpilot branch (prevents infinite loops)
+    if: "!startsWith(github.head_ref, 'docpilot/')"
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    outputs:
+      has_changes: ${{ steps.analyze.outputs.has_changes }}
+      pr_url: ${{ steps.create-pr.outputs.pr_url }}
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref || github.ref }}
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Install GitHub Copilot CLI
+        run: |
+          # Install Copilot CLI (adjust based on actual installation method)
+          npm install -g @githubnext/github-copilot-cli
+          copilot --version
+      
+      - name: Install DocPilot
+        run: |
+          # Option 1: Install from NuGet (when published)
+          # dotnet tool install -g docpilot
+          
+          # Option 2: Build from source (for development)
+          dotnet build src/DocPilot/DocPilot.csproj -c Release
+      
+      - name: Analyze changes
+        id: analyze
+        run: |
+          BASE_REF="${{ github.event.inputs.base_ref || github.base_ref }}"
+          HEAD_REF="${{ github.event.inputs.head_ref || github.head_ref }}"
+          
+          echo "Analyzing changes between $BASE_REF and $HEAD_REF"
+          
+          # Run analysis
+          ANALYSIS=$(dotnet run --project src/DocPilot -- analyze \
+            --base "$BASE_REF" \
+            --head "$HEAD_REF" \
+            --output json)
+          
+          echo "Analysis output:"
+          echo "$ANALYSIS"
+          
+          # Check if there are documentation targets
+          HAS_CHANGES=$(echo "$ANALYSIS" | jq -r '.mapping.targets | length > 0')
+          echo "has_changes=$HAS_CHANGES" >> $GITHUB_OUTPUT
+          
+          # Save analysis for next step
+          echo "$ANALYSIS" > /tmp/analysis.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Generate documentation
+        if: steps.analyze.outputs.has_changes == 'true'
+        id: generate
+        run: |
+          BASE_REF="${{ github.event.inputs.base_ref || github.base_ref }}"
+          HEAD_REF="${{ github.event.inputs.head_ref || github.head_ref }}"
+          
+          echo "Generating documentation updates..."
+          
+          dotnet run --project src/DocPilot -- generate \
+            --base "$BASE_REF" \
+            --head "$HEAD_REF"
+          
+          # Check for changes
+          if git diff --quiet; then
+            echo "No documentation changes generated"
+            echo "generated=false" >> $GITHUB_OUTPUT
+          else
+            echo "Documentation changes generated"
+            echo "generated=true" >> $GITHUB_OUTPUT
+            
+            # List changed files
+            git diff --name-only
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create documentation PR
+        if: steps.generate.outputs.generated == 'true'
+        id: create-pr
+        run: |
+          # Configure git
+          git config --global user.name "DocPilot Bot"
+          git config --global user.email "docpilot[bot]@users.noreply.github.com"
+          
+          # Create branch
+          BRANCH_NAME="docpilot/docs-$(date +%Y%m%d%H%M%S)"
+          git checkout -b "$BRANCH_NAME"
+          
+          # Stage and commit changes
+          git add -A
+          git commit -m "docs: update documentation for recent changes"
+          
+          # Push branch
+          git push origin "$BRANCH_NAME"
+          
+          # Create PR
+          PR_URL=$(gh pr create \
+            --title "📝 docs: Automated documentation update" \
+            --body "This PR was automatically generated by DocPilot to keep documentation in sync with code changes.
+            
+            ## Changes
+            
+            $(git diff --name-only HEAD~1)
+            
+            ---
+            *Generated with ❤️ by DocPilot*" \
+            --base "${{ github.base_ref || 'main' }}" \
+            --head "$BRANCH_NAME" \
+            --label "documentation,docpilot")
+          
+          echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          echo "Created PR: $PR_URL"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Comment on original PR
+        if: steps.create-pr.outputs.pr_url != '' && github.event_name == 'pull_request'
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "📝 **DocPilot** has detected that this PR may require documentation updates.
+            
+            A documentation PR has been created: ${{ steps.create-pr.outputs.pr_url }}
+            
+            Please review the suggested changes and merge if appropriate."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Summary
+        run: |
+          echo "## DocPilot Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.analyze.outputs.has_changes }}" == "true" ]; then
+            echo "✅ Documentation targets identified" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No documentation changes needed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -n "${{ steps.create-pr.outputs.pr_url }}" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "📝 Documentation PR: ${{ steps.create-pr.outputs.pr_url }}" >> $GITHUB_STEP_SUMMARY
+          fi
+```
+
+#### 9.3 Creare workflow-dispatch.yml per manual trigger
+- [x] Crea il file `.github/workflows/docpilot-manual.yml`:
+
+```yaml
+name: DocPilot - Manual Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base ref for comparison (commit SHA or branch)'
+        required: true
+        default: 'HEAD~1'
+      head_ref:
+        description: 'Head ref for comparison (commit SHA or branch)'
+        required: true
+        default: 'HEAD'
+      target_branch:
+        description: 'Target branch for the documentation PR'
+        required: true
+        default: 'main'
+      dry_run:
+        description: 'Dry run mode (no PR created)'
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  manual-docpilot:
+    name: Run DocPilot Manually
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Install GitHub Copilot CLI
+        run: |
+          npm install -g @githubnext/github-copilot-cli
+      
+      - name: Build DocPilot
+        run: |
+          dotnet build src/DocPilot/DocPilot.csproj -c Release
+      
+      - name: Run DocPilot
+        run: |
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "Running in dry-run mode..."
+            dotnet run --project src/DocPilot -- generate \
+              --base "${{ inputs.base_ref }}" \
+              --head "${{ inputs.head_ref }}" \
+              --dry-run
+          else
+            dotnet run --project src/DocPilot -- pr \
+              --base "${{ inputs.base_ref }}" \
+              --head "${{ inputs.head_ref }}" \
+              --target-branch "${{ inputs.target_branch }}"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+#### 9.4 Creare template docpilot.yml per utenti
+- [x] Crea il file `templates/docpilot.yml`:
+
+```yaml
+# DocPilot Configuration
+# Copy this file to your repository root as docpilot.yml
+
+# Documentation paths to consider
+docs:
+  paths:
+    - docs/
+    - README.md
+    - CHANGELOG.md
+  
+  # Glob patterns to exclude
+  exclude:
+    - docs/generated/
+    - "*.bak"
+
+# Code paths to analyze for changes
+source:
+  paths:
+    - src/
+    - lib/
+  
+  # File extensions to analyze
+  extensions:
+    - .cs
+    - .ts
+    - .js
+    - .py
+    - .go
+    - .rs
+
+# Confidence threshold for automatic PR creation
+# Values: 0.0 - 1.0
+# Below this threshold, PRs are created as drafts
+confidence:
+  threshold: 0.7
+  draft_below: 0.5
+
+# PR creation settings
+pull_request:
+  # Branch naming pattern (supports: {type}, {timestamp}, {hash})
+  branch_pattern: "docpilot/{type}-{timestamp}"
+  
+  # Default labels to add
+  labels:
+    - documentation
+    - docpilot
+  
+  # Add label based on confidence
+  confidence_labels:
+    high: ready-for-review
+    medium: needs-review
+    low: draft
+
+# Agent settings
+agent:
+  # Model to use (default: gpt-5)
+  model: gpt-5
+  
+  # Enable streaming responses
+  streaming: true
+  
+  # Maximum retries on failure
+  max_retries: 3
+```
+
+### Step 9 Verification Checklist
+- [x] Workflow files have correct YAML syntax (`yamllint .github/workflows/*.yml`)
+- [x] Path filters are correctly configured to prevent infinite loops
+- [x] Permissions are correctly set for write access
+- [x] Environment variables are properly referenced
+- [x] Template file is properly documented
+
+### Step 9 STOP & COMMIT
+**STOP & COMMIT:** Fermarsi qui e attendere che l'utente testi, faccia stage e commit.
+
+Messaggio commit suggerito:
+```
+ci(github): add GitHub Actions workflows for DocPilot
+
+- Add docpilot.yml workflow for PR-triggered documentation sync
+- Add docpilot-manual.yml for manual workflow dispatch
+- Add path filters to prevent infinite loops on doc changes
+- Add template docpilot.yml for user configuration
+- Include PR commenting and job summary
+```

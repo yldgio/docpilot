@@ -1,0 +1,69 @@
+name: DocPilot - Manual Run
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_ref:
+        description: 'Base ref for comparison (commit SHA or branch)'
+        required: true
+        default: 'HEAD~1'
+      head_ref:
+        description: 'Head ref for comparison (commit SHA or branch)'
+        required: true
+        default: 'HEAD'
+      target_branch:
+        description: 'Target branch for the documentation PR'
+        required: true
+        default: 'main'
+      dry_run:
+        description: 'Dry run mode (no PR created)'
+        type: boolean
+        default: false
+
+env:
+  DOTNET_VERSION: '10.0.x'
+
+jobs:
+  manual-docpilot:
+    name: Run DocPilot Manually
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Install GitHub Copilot CLI
+        run: |
+          npm install -g @githubnext/github-copilot-cli
+      
+      - name: Build DocPilot
+        run: |
+          dotnet build src/DocPilot/DocPilot.csproj -c Release
+      
+      - name: Run DocPilot
+        run: |
+          if [ "${{ inputs.dry_run }}" == "true" ]; then
+            echo "Running in dry-run mode..."
+            dotnet run --project src/DocPilot -- generate \
+              --base "${{ inputs.base_ref }}" \
+              --head "${{ inputs.head_ref }}" \
+              --dry-run
+          else
+            dotnet run --project src/DocPilot -- pr \
+              --base "${{ inputs.base_ref }}" \
+              --head "${{ inputs.head_ref }}" \
+              --target-branch "${{ inputs.target_branch }}"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
