@@ -54,8 +54,8 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
-      - name: Setup GitHub Copilot CLI
-        run: gh extension install github/gh-copilot
+      - name: Verify GitHub Copilot CLI
+        run: gh copilot --version
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
