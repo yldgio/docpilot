@@ -54,11 +54,10 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
-      - name: Install GitHub Copilot CLI
-        run: |
-          # Install Copilot CLI (adjust based on actual installation method)
-          npm install -g @githubnext/github-copilot-cli
-          copilot --version
+      - name: Setup GitHub Copilot CLI
+        run: gh extension install github/gh-copilot
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Install DocPilot
         run: |
