@@ -39,7 +39,7 @@ public sealed class DocWriterAgent : IAsyncDisposable
 
         _session = await _client.CreateSessionAsync(new SessionConfig
         {
-            Model = "gpt-5",
+            Model = "gpt-4.1",
             Streaming = true,
             SystemMessage = new SystemMessageConfig
             {
