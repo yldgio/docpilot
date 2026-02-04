@@ -34,22 +34,26 @@ public sealed class OrchestratorAgent : IAsyncDisposable
 
         await _client.StartAsync();
 
+        var tools = new[]
+        {
+            AnalyzeDiffTool.Create(_context),
+            AnalyzeDiffTool.CreateForStaged(_context),
+            MapDocTargetsTool.Create(_context),
+            ReadFileTool.Create(_context)
+        };
+
+        Console.Error.WriteLine($"Registering {tools.Length} tools...");
+
         _session = await _client.CreateSessionAsync(new SessionConfig
         {
-            Model = "gpt-5",
+            Model = "gpt-4.1",
             Streaming = true,
             SystemMessage = new SystemMessageConfig
             {
                 Mode = SystemMessageMode.Append,
                 Content = SystemPrompts.Orchestrator
             },
-            Tools =
-            [
-                AnalyzeDiffTool.Create(_context),
-                AnalyzeDiffTool.CreateForStaged(_context),
-                MapDocTargetsTool.Create(_context),
-                ReadFileTool.Create(_context)
-            ]
+            Tools = tools
         });
     }
 
@@ -78,15 +82,11 @@ public sealed class OrchestratorAgent : IAsyncDisposable
                     break;
 
                 case AssistantMessageEvent msg:
-                    done.TrySetResult(msg.Data.Content);
+                    done.TrySetResult(msg.Data.Content ?? string.Empty);
                     break;
 
                 case ToolExecutionStartEvent toolStart:
-                    Console.Error.WriteLine($"\n[TOOL] Starting: {toolStart.Data.ToolName}");
-                    break;
-
-                case ToolExecutionCompleteEvent:
-                    Console.Error.WriteLine("[TOOL] Completed");
+                    Console.WriteLine($"\n  → {toolStart.Data.ToolName}");
                     break;
 
                 case SessionErrorEvent error:
@@ -106,18 +106,17 @@ public sealed class OrchestratorAgent : IAsyncDisposable
         try
         {
             var prompt = $"""
-                Analyze the changes between '{baseRef}' and '{headRef}'.
+                You MUST use your tools to complete this task. Do NOT simulate or describe what you would do.
 
-                1. First, call analyze_diff with baseRef="{baseRef}" and headRef="{headRef}"
-                2. Then, call map_doc_targets to identify documentation targets
-                3. For each high-confidence target, call read_file to check existing content
-                4. Generate a documentation brief with your recommendations
+                STEP 1: Call the analyze_diff tool with baseRef="{baseRef}" and headRef="{headRef}"
+                STEP 2: After getting the diff result, call map_doc_targets
+                STEP 3: Report your findings
 
-                Return your analysis as a structured JSON response.
+                Execute the tools NOW.
                 """;
 
-            await _session.SendAsync(new MessageOptions { Prompt = prompt });
-            var response = await done.Task;
+            var result = await _session.SendAndWaitAsync(new MessageOptions { Prompt = prompt });
+            var response = result?.Data.Content ?? responseBuilder.ToString();
 
             // Verify that tools were actually called successfully
             var hasMapping = _context.MappingResult is not null;
@@ -182,12 +181,10 @@ public sealed class OrchestratorAgent : IAsyncDisposable
                 1. Call analyze_staged to get the staged diff
                 2. Call map_doc_targets to identify documentation targets
                 3. Generate a documentation brief
-
-                Return your analysis as a structured JSON response.
                 """;
 
-            await _session.SendAsync(new MessageOptions { Prompt = prompt });
-            var response = await done.Task;
+            var result = await _session.SendAndWaitAsync(new MessageOptions { Prompt = prompt });
+            var response = result?.Data.Content ?? responseBuilder.ToString();
 
             // Verify that tools were actually called successfully
             var hasMapping = _context.MappingResult is not null;
