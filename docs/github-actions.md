@@ -2,6 +2,28 @@
 
 Automate documentation updates on every pull request with GitHub Actions.
 
+## Prerequisites
+
+### Copilot Token Setup
+
+DocPilot requires a GitHub token with Copilot access for CI/CD:
+
+1. **Create a Fine-grained PAT:**
+   - Go to [GitHub Settings → Developer settings → Fine-grained tokens](https://github.com/settings/tokens?type=beta)
+   - Click "Generate new token"
+   - Name: `DocPilot CI`
+   - Repository access: Select your repository
+   - Permissions:
+     - **Copilot**: `Read-only`
+     - **Contents**: `Read-only`
+   - Generate and copy the token
+
+2. **Add Repository Secret:**
+   - Go to your repository → Settings → Secrets and variables → Actions
+   - Click "New repository secret"
+   - Name: `COPILOT_TOKEN`
+   - Value: paste the token from step 1
+
 ## Quick Setup
 
 Create `.github/workflows/docpilot.yml`:
@@ -44,18 +66,23 @@ jobs:
             --base ${{ github.event.pull_request.base.sha }} \
             --head ${{ github.event.pull_request.head.sha }} \
             --output text
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
             
       - name: Generate Documentation
         run: |
           ./docpilot generate \
             --base ${{ github.event.pull_request.base.sha }} \
             --head ${{ github.event.pull_request.head.sha }}
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
             
       - name: Create Documentation PR
         run: |
           ./docpilot pr \
             --target-branch ${{ github.head_ref }}
         env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
@@ -69,6 +96,7 @@ Creates a new PR for documentation changes:
 - name: Create Documentation PR
   run: ./docpilot pr --target-branch main
   env:
+    COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
@@ -79,6 +107,8 @@ Adds documentation to the current PR:
 ```yaml
 - name: Generate Documentation
   run: ./docpilot generate --base ${{ github.event.pull_request.base.sha }} --head ${{ github.event.pull_request.head.sha }}
+  env:
+    COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
   
 - name: Commit Documentation
   run: |
@@ -103,6 +133,7 @@ Post analysis as a PR comment instead of making changes:
     
     Run \`docpilot generate\` locally to apply these changes."
   env:
+    COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
     GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 ```
 
@@ -268,8 +299,14 @@ For organization repositories, you may need to enable "Allow GitHub Actions to c
 
 | Secret | Required | Description |
 |--------|----------|-------------|
-| `GITHUB_TOKEN` | Yes | Automatic token, no setup needed |
-| `GH_TOKEN` | Optional | PAT for cross-repo operations |
+| `COPILOT_TOKEN` | **Yes** | Fine-grained PAT with Copilot permission (see Prerequisites) |
+| `GITHUB_TOKEN` | Yes | Automatic token for Git/PR operations |
+
+### Setting up COPILOT_TOKEN
+
+The `COPILOT_TOKEN` secret is required for DocPilot to use GitHub Copilot in CI. See the [Prerequisites](#prerequisites) section for setup instructions.
+
+**Important:** The default `GITHUB_TOKEN` does not have Copilot access. You must create a separate fine-grained PAT with the Copilot permission.
 
 ## Troubleshooting
 

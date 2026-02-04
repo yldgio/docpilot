@@ -91,6 +91,7 @@ jobs:
           # Save analysis for next step
           echo "$ANALYSIS" > /tmp/analysis.json
         env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Generate documentation
@@ -118,6 +119,7 @@ jobs:
             git diff --name-only
           fi
         env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       
       - name: Create documentation PR

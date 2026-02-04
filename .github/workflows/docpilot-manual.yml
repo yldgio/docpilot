@@ -67,4 +67,5 @@ jobs:
               --target-branch "${{ inputs.target_branch }}"
           fi
         env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
