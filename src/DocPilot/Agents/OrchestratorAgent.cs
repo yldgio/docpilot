@@ -110,10 +110,14 @@ public sealed class OrchestratorAgent : IAsyncDisposable
             await _session.SendAsync(new MessageOptions { Prompt = prompt });
             var response = await done.Task;
 
+            // Verify that tools were actually called successfully
+            var hasMapping = _context.MappingResult is not null;
+
             return new OrchestratorResult
             {
-                Success = true,
+                Success = hasMapping,
                 RawResponse = response,
+                Error = hasMapping ? null : response,
                 Diff = _context.CurrentDiff,
                 Mapping = _context.MappingResult
             };
@@ -176,10 +180,14 @@ public sealed class OrchestratorAgent : IAsyncDisposable
             await _session.SendAsync(new MessageOptions { Prompt = prompt });
             var response = await done.Task;
 
+            // Verify that tools were actually called successfully
+            var hasMapping = _context.MappingResult is not null;
+
             return new OrchestratorResult
             {
-                Success = true,
+                Success = hasMapping,
                 RawResponse = response,
+                Error = hasMapping ? null : response,
                 Diff = _context.CurrentDiff,
                 Mapping = _context.MappingResult
             };
