@@ -85,8 +85,8 @@ public sealed class OrchestratorAgent : IAsyncDisposable
                     Console.Error.WriteLine($"\n[TOOL] Starting: {toolStart.Data.ToolName}");
                     break;
 
-                case ToolExecutionCompleteEvent toolComplete:
-                    Console.Error.WriteLine($"[TOOL] Completed: {toolComplete.Data.ToolName}");
+                case ToolExecutionCompleteEvent:
+                    Console.Error.WriteLine("[TOOL] Completed");
                     break;
 
                 case SessionErrorEvent error:
