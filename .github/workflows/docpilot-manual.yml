@@ -68,4 +68,5 @@ jobs:
           fi
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.COPILOT_TOKEN }}
+          GH_TOKEN: ${{ secrets.COPILOT_TOKEN }}
