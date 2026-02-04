@@ -123,7 +123,9 @@ public sealed class DocWriterAgent : IAsyncDisposable
                 Focus on clarity and accuracy. Include code examples where relevant.
                 """;
 
-            await _session.SendAndWaitAsync(new MessageOptions { Prompt = prompt });
+            await _session.SendAndWaitAsync(
+                new MessageOptions { Prompt = prompt },
+                timeout: TimeSpan.FromMinutes(5));
             var response = responseBuilder.ToString();
 
             return new WriterResult
