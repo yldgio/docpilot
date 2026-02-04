@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            rid: win-x64
+            artifact: docpilot-win-x64.exe
+            binary: docpilot.exe
+          - os: ubuntu-latest
+            rid: linux-x64
+            artifact: docpilot-linux-x64
+            binary: docpilot
+          - os: macos-latest
+            rid: osx-x64
+            artifact: docpilot-osx-x64
+            binary: docpilot
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish
+        run: |
+          dotnet publish src/DocPilot -c Release -r ${{ matrix.rid }} --self-contained -o ./publish
+
+      - name: Rename artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          Move-Item ./publish/${{ matrix.binary }} ./publish/${{ matrix.artifact }}
+
+      - name: Rename artifact (Unix)
+        if: matrix.os != 'windows-latest'
+        run: |
+          mv ./publish/${{ matrix.binary }} ./publish/${{ matrix.artifact }}
+          chmod +x ./publish/${{ matrix.artifact }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ./publish/${{ matrix.artifact }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ./artifacts/docpilot-win-x64.exe/docpilot-win-x64.exe
+            ./artifacts/docpilot-linux-x64/docpilot-linux-x64
+            ./artifacts/docpilot-osx-x64/docpilot-osx-x64
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref, 'alpha') || contains(github.ref, 'beta') || contains(github.ref, 'rc') }}
